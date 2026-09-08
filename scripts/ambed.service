@@ -1,15 +1,16 @@
 [Unit]
-Description=AMBE Transcoder Daemon
-After=network.target
+Description=AMBEd AMBE transcoding server
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
-User=root
-Group=root
-ExecStartPre=-/sbin/rmmod ftdi_sio
-ExecStartPre=-/sbin/rmmod usb_serial
-ExecStart=/ambed/ambed 127.0.0.1
-Restart=on-abnormal
+Environment=AMBED_BIND_IP=127.0.0.1
+EnvironmentFile=-/etc/default/ambed
+ExecStartPre=/usr/local/sbin/ambed-usb-unbind
+ExecStart=/ambed/ambed ${AMBED_BIND_IP}
+Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

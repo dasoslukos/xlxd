@@ -1,0 +1,2 @@
+# Local IP address AMBEd should bind to.
+AMBED_BIND_IP=127.0.0.1
