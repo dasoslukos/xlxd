@@ -1,11 +1,15 @@
 CXX ?= g++
 
+# FTDI D2XX SDK/library location used at build time.
 D2XX_ROOT ?= /usr/local
 D2XX_LIBDIR ?= $(D2XX_ROOT)/lib
+D2XX_LIBRARY ?= libftd2xx.so.1.4.6
 
+# Installation paths.
 PREFIX = /usr/local
 BINDIR = $(PREFIX)/bin
 SBINDIR = $(PREFIX)/sbin
+LIBDIR = $(PREFIX)/lib
 SYSCONFDIR = /etc
 SYSTEMD_UNITDIR = /etc/systemd/system
 DESTDIR =
@@ -19,7 +23,7 @@ SOURCES := $(wildcard *.cpp)
 OBJECTS := $(SOURCES:.cpp=.o)
 EXECUTABLE := ambed
 
-.PHONY: all clean install
+.PHONY: all clean install install-d2xx
 
 all: $(EXECUTABLE)
 
@@ -52,4 +56,18 @@ install: $(EXECUTABLE)
 			$(DESTDIR)$(SYSCONFDIR)/default/ambed; \
 	else \
 		echo "Preserving existing $(SYSCONFDIR)/default/ambed"; \
+	fi
+
+install-d2xx:
+	test -f "$(D2XX_LIBDIR)/$(D2XX_LIBRARY)"
+	install -d $(DESTDIR)$(LIBDIR)
+	install -m 0755 \
+		$(D2XX_LIBDIR)/$(D2XX_LIBRARY) \
+		$(DESTDIR)$(LIBDIR)/$(D2XX_LIBRARY)
+	ln -sfn $(D2XX_LIBRARY) \
+		$(DESTDIR)$(LIBDIR)/libftd2xx.so
+	@if [ -z "$(DESTDIR)" ]; then \
+		ldconfig; \
+	else \
+		echo "Skipping ldconfig for staged install"; \
 	fi
