@@ -1,22 +1,31 @@
-CC=g++
-CFLAGS=-c -std=c++11 -pthread
-LDFLAGS=-std=c++11 -pthread 
-SOURCES=$(wildcard *.cpp)
-OBJECTS=$(SOURCES:.cpp=.o)
-EXECUTABLE=ambed
+CXX ?= g++
 
-all: $(SOURCES) $(EXECUTABLE)
+D2XX_ROOT ?= /usr/local
+D2XX_LIBDIR ?= $(D2XX_ROOT)/lib
+
+CPPFLAGS ?=
+CXXFLAGS ?= -O2 -std=c++17 -Wall -Wextra -Wpedantic
+LDFLAGS ?=
+LDLIBS ?= -lftd2xx -pthread
+
+SOURCES := $(wildcard *.cpp)
+OBJECTS := $(SOURCES:.cpp=.o)
+EXECUTABLE := ambed
+
+.PHONY: all clean install
+
+all: $(EXECUTABLE)
 
 $(EXECUTABLE): $(OBJECTS)
-	$(CC) $(LDFLAGS) $(OBJECTS) -lftd2xx -Wl,-rpath,/usr/local/lib -o $@
+	$(CXX) $(LDFLAGS) -L$(D2XX_LIBDIR) $(OBJECTS) $(LDLIBS) -o $@
 
-.cpp.o:
-	$(CC) $(CFLAGS) $< -o $@
+%.o: %.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -pthread -c $< -o $@
 
 clean:
-	$(RM) $(EXECUTABLE) *.o
+	$(RM) $(EXECUTABLE) $(OBJECTS)
 
-install:
+install: $(EXECUTABLE)
 	mkdir -p /ambed
 	cp $(EXECUTABLE) /ambed/
 	cp ./run /ambed/
