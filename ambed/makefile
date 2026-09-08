@@ -1,7 +1,13 @@
 CXX ?= g++
 
-# FTDI D2XX SDK/library location used at build time.
-D2XX_ROOT ?= /usr/local
+# FTDI D2XX SDK/library location.
+#
+# By default AMBEd uses the known-good D2XX 1.4.6 x86_64 runtime
+# included under vendor/. This can still be overridden, for example:
+#
+#   make D2XX_ROOT=/opt/ftdi/d2xx
+#
+D2XX_ROOT ?= ../vendor/ftdi/d2xx/1.4.6/x86_64
 D2XX_LIBDIR ?= $(D2XX_ROOT)/lib
 D2XX_LIBRARY ?= libftd2xx.so.1.4.6
 
