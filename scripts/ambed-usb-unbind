@@ -1,0 +1,37 @@
+#!/bin/bash
+set -euo pipefail
+
+AMBE_SERIALS=(
+    "DK7KL73P"
+    "D27HLII1"
+)
+
+for serial in "${AMBE_SERIALS[@]}"; do
+    found=0
+
+    for dev in /sys/bus/usb/devices/*; do
+        [[ -f "$dev/serial" ]] || continue
+        [[ "$(cat "$dev/serial")" == "$serial" ]] || continue
+
+        found=1
+
+        for intf in "$dev":*; do
+            [[ -e "$intf" ]] || continue
+            [[ -L "$intf/driver" ]] || continue
+
+            driver="$(basename "$(readlink -f "$intf/driver")")"
+            iface="$(basename "$intf")"
+
+            if [[ "$driver" == "ftdi_sio" ]]; then
+                echo "Unbinding AMBE device $serial from $iface"
+                echo -n "$iface" > /sys/bus/usb/drivers/ftdi_sio/unbind
+            else
+                echo "AMBE device $serial interface $iface uses driver $driver"
+            fi
+        done
+    done
+
+    if [[ "$found" -eq 0 ]]; then
+        echo "AMBE device $serial not found"
+    fi
+done
