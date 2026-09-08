@@ -8,7 +8,7 @@ Type=simple
 Environment=AMBED_BIND_IP=127.0.0.1
 EnvironmentFile=-/etc/default/ambed
 ExecStartPre=/usr/local/sbin/ambed-usb-unbind
-ExecStart=/ambed/ambed ${AMBED_BIND_IP}
+ExecStart=/usr/local/bin/ambed ${AMBED_BIND_IP}
 Restart=on-failure
 RestartSec=5
 
