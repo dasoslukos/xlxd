@@ -1,37 +1,62 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 set -euo pipefail
 
-AMBE_SERIALS=(
-    "DK7KL73P"
-    "D27HLII1"
+if [[ $EUID -ne 0 ]]; then
+    echo "ambed-usb-unbind must be run as root" >&2
+    exit 1
+fi
+
+FTDI_DRIVER="/sys/bus/usb/drivers/ftdi_sio"
+
+SUPPORTED_PRODUCTS=(
+    "USB-3000"
+    "DVstick-30"
+    "ThumbDV"
+    "USB-3003"
+    "DF2ET-3003"
+    "DVstick-33"
+    "ThumbDV-3"
+    "USB-3006 A"
+    "USB-3012 A"
 )
 
-for serial in "${AMBE_SERIALS[@]}"; do
-    found=0
+is_supported_product()
+{
+    local product="$1"
 
-    for dev in /sys/bus/usb/devices/*; do
-        [[ -f "$dev/serial" ]] || continue
-        [[ "$(cat "$dev/serial")" == "$serial" ]] || continue
-
-        found=1
-
-        for intf in "$dev":*; do
-            [[ -e "$intf" ]] || continue
-            [[ -L "$intf/driver" ]] || continue
-
-            driver="$(basename "$(readlink -f "$intf/driver")")"
-            iface="$(basename "$intf")"
-
-            if [[ "$driver" == "ftdi_sio" ]]; then
-                echo "Unbinding AMBE device $serial from $iface"
-                echo -n "$iface" > /sys/bus/usb/drivers/ftdi_sio/unbind
-            else
-                echo "AMBE device $serial interface $iface uses driver $driver"
-            fi
-        done
+    for supported in "${SUPPORTED_PRODUCTS[@]}"; do
+        [[ "$product" == "$supported" ]] && return 0
     done
 
-    if [[ "$found" -eq 0 ]]; then
-        echo "AMBE device $serial not found"
-    fi
+    return 1
+}
+
+for dev in /sys/bus/usb/devices/*; do
+    [[ -f "$dev/idVendor" ]] || continue
+    [[ -f "$dev/product" ]] || continue
+
+    # AMBEd currently uses FTDI-based vocoder interfaces.
+    [[ "$(<"$dev/idVendor")" == "0403" ]] || continue
+
+    product="$(<"$dev/product")"
+
+    is_supported_product "$product" || continue
+
+    serial="unknown"
+    [[ -f "$dev/serial" ]] && serial="$(<"$dev/serial")"
+
+    for intf in "$dev":*; do
+        [[ -e "$intf" ]] || continue
+        [[ -L "$intf/driver" ]] || continue
+
+        driver="$(basename "$(readlink -f "$intf/driver")")"
+
+        [[ "$driver" == "ftdi_sio" ]] || continue
+
+        iface="$(basename "$intf")"
+
+        echo "Unbinding $product ($serial) from $iface"
+        printf '%s' "$iface" > "$FTDI_DRIVER/unbind"
+    done
 done
