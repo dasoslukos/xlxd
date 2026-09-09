@@ -1,0 +1,31 @@
+AMBEd for Windows x64 - Third-Party Notices
+
+FTDI D2XX
+==========
+
+AMBEd communicates with supported FTDI-based USB vocoder devices through
+Future Technology Devices International Limited (FTDI) D2XX.
+
+The FTDI D2XX driver/runtime is proprietary third-party software and is NOT
+included in this AMBEd Windows release package.
+
+Obtain the Windows D2XX driver/runtime directly from FTDI:
+
+https://ftdichip.com/drivers/d2xx-drivers/
+
+FTDI states on its D2XX driver page that its drivers are for use with
+products based on FTDI parts and that the drivers may be distributed as
+long as the license information is not modified.
+
+This package intentionally leaves the FTDI driver/runtime separate and
+directs users to FTDI's official distribution.
+
+FTDI and D2XX are trademarks or product names of their respective owner.
+
+AMBEd / XLXD
+============
+
+AMBEd / XLXD is distributed under the GNU General Public License version 3.
+See license.txt and the corresponding source repository:
+
+https://github.com/dasoslukos/xlxd

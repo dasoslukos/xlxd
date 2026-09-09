@@ -12,6 +12,14 @@ file(GLOB AMBED_SOURCES CONFIGURE_DEPENDS
 
 add_executable(ambed ${AMBED_SOURCES})
 
+if(MSVC)
+    # Statically link the Microsoft C/C++ runtime so the Windows release
+    # does not require the Visual C++ Redistributable to be installed.
+    set_property(TARGET ambed PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+    )
+endif()
+
 target_include_directories(ambed PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
 )
