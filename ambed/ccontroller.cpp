@@ -90,7 +90,7 @@ bool CController::Init(void)
     }
     
     // done
-    return true;
+    return ok;
 }
 
 void CController::Close(void)

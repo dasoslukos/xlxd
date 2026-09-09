@@ -40,6 +40,7 @@ if(WIN32)
         "${D2XX_LIBRARY}"
         ws2_32
         winmm
+        advapi32
     )
 else()
     find_package(Threads REQUIRED)

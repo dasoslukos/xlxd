@@ -27,38 +27,211 @@
 #include "cambeserver.h"
 
 #include <cstdlib>
+#include <cstring>
+#include <string>
 
 #ifdef _WIN32
-#include <windows.h>
-#include <mmsystem.h>
+
+#include "cwindowsservice.h"
+
 #else
+
 #include "syslog.h"
+
+#include <csignal>
 #include <sys/stat.h>
 #include <unistd.h>
+
+namespace
+{
+    volatile std::sig_atomic_t g_StopRequested = 0;
+
+    void HandleSignal(int)
+    {
+        g_StopRequested = 1;
+    }
+}
+
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////////////
-// global objects
+// helpers
 
+#ifdef _WIN32
+
+namespace
+{
+    void PrintUsage(void)
+    {
+        std::cout
+            << "AMBEd " << VERSION_MAJOR << "."
+            << VERSION_MINOR << "."
+            << VERSION_REVISION << std::endl
+            << std::endl
+            << "Console mode:" << std::endl
+            << "  ambed <ip> [--log <path>]" << std::endl
+            << std::endl
+            << "Windows service:" << std::endl
+            << "  ambed --install <ip> [--log <path>]" << std::endl
+            << "  ambed --uninstall" << std::endl
+            << std::endl
+            << "Internal SCM mode:" << std::endl
+            << "  ambed --service <ip> [--log <path>]" << std::endl
+            << std::endl
+            << "Examples:" << std::endl
+            << "  ambed 192.168.178.212" << std::endl
+            << "  ambed --install 192.168.178.212" << std::endl;
+    }
+
+    bool ParseLogOption(int argc,
+                        const char *argv[],
+                        int startIndex,
+                        const std::string &defaultLogPath,
+                        std::string *logPath)
+    {
+        *logPath = defaultLogPath;
+
+        int index = startIndex;
+
+        while (index < argc)
+        {
+            if ((std::strcmp(argv[index], "--log") == 0) &&
+                ((index + 1) < argc))
+            {
+                *logPath = argv[index + 1];
+                index += 2;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////
-// function declaration
+// main
 
-
-int main(int argc, const char * argv[])
+int main(int argc, const char *argv[])
 {
-#if defined(RUN_AS_DAEMON) && !defined(_WIN32)
+#ifdef _WIN32
+
+    if (argc < 2)
+    {
+        PrintUsage();
+        return EXIT_FAILURE;
+    }
+
+    if ((std::strcmp(argv[1], "--help") == 0) ||
+        (std::strcmp(argv[1], "-h") == 0) ||
+        (std::strcmp(argv[1], "/?") == 0))
+    {
+        PrintUsage();
+        return EXIT_SUCCESS;
+    }
+
+    if (std::strcmp(argv[1], "--version") == 0)
+    {
+        std::cout
+            << "AMBEd "
+            << VERSION_MAJOR << "."
+            << VERSION_MINOR << "."
+            << VERSION_REVISION
+            << std::endl;
+
+        return EXIT_SUCCESS;
+    }
+
+    if (std::strcmp(argv[1], "--uninstall") == 0)
+    {
+        if (argc != 2)
+        {
+            PrintUsage();
+            return EXIT_FAILURE;
+        }
+
+        return WindowsService::Uninstall();
+    }
+
+    if (std::strcmp(argv[1], "--install") == 0)
+    {
+        if (argc < 3)
+        {
+            PrintUsage();
+            return EXIT_FAILURE;
+        }
+
+        std::string logPath;
+
+        if (!ParseLogOption(
+                argc,
+                argv,
+                3,
+                WindowsService::DefaultServiceLogPath(),
+                &logPath))
+        {
+            PrintUsage();
+            return EXIT_FAILURE;
+        }
+
+        return WindowsService::Install(argv[2], logPath);
+    }
+
+    if (std::strcmp(argv[1], "--service") == 0)
+    {
+        if (argc < 3)
+        {
+            return EXIT_FAILURE;
+        }
+
+        std::string logPath;
+
+        if (!ParseLogOption(
+                argc,
+                argv,
+                3,
+                WindowsService::DefaultServiceLogPath(),
+                &logPath))
+        {
+            return EXIT_FAILURE;
+        }
+
+        return WindowsService::RunService(argv[2], logPath);
+    }
+
+    std::string logPath;
+
+    if (!ParseLogOption(
+            argc,
+            argv,
+            2,
+            "ambed.log",
+            &logPath))
+    {
+        PrintUsage();
+        return EXIT_FAILURE;
+    }
+
+    return WindowsService::RunConsole(argv[1], logPath);
+
+#else
+
+#if defined(RUN_AS_DAEMON)
 
     // redirect cout, cerr and clog to syslog
     syslog::redirect cout_redir(std::cout);
     syslog::redirect cerr_redir(std::cerr);
     syslog::redirect clog_redir(std::clog);
 
-    //Fork the Parent Process
+    // Fork the Parent Process
     pid_t pid, sid;
     pid = ::fork();
-    //pid = ::vfork();
-    if ( pid < 0 )
+
+    if (pid < 0)
     {
         return EXIT_FAILURE;
     }
@@ -72,7 +245,7 @@ int main(int argc, const char * argv[])
     // Change File Mask
     ::umask(0);
 
-    //Create a new Signature Id for our child
+    // Create a new Session Id for our child
     sid = ::setsid();
     if (sid < 0)
     {
@@ -80,8 +253,7 @@ int main(int argc, const char * argv[])
     }
 
     // Change Directory
-    // If we cant find the directory we exit with failure.
-    if ( (::chdir("/")) < 0)
+    if ((::chdir("/")) < 0)
     {
         exit(EXIT_FAILURE);
     }
@@ -93,77 +265,48 @@ int main(int argc, const char * argv[])
 
 #endif
 
-    // check arguments
-    if ( argc != 2 )
+    if (argc != 2)
     {
         std::cout << "Usage: ambed ip" << std::endl;
         std::cout << "example: ambed 192.168.178.212" << std::endl;
-        return 1;
-    }
-
-#ifdef _WIN32
-    // Winsock must be initialized before any socket or name-resolution calls.
-    WSADATA wsaData {};
-    const int wsaResult = ::WSAStartup(MAKEWORD(2, 2), &wsaData);
-
-    if (wsaResult != 0)
-    {
-        std::cerr << "WSAStartup failed with error " << wsaResult << std::endl;
         return EXIT_FAILURE;
     }
 
-    // AMBEd's vocoder processing loop relies on millisecond-scale sleeps.
-    // Request 1 ms timer resolution so a 2 ms sleep does not become ~15 ms.
-    if (::timeBeginPeriod(1) != TIMERR_NOERROR)
-    {
-        std::cerr << "timeBeginPeriod(1) failed" << std::endl;
-        ::WSACleanup();
-        return EXIT_FAILURE;
-    }
-#endif
+    std::signal(SIGINT, HandleSignal);
+    std::signal(SIGTERM, HandleSignal);
 
-    // initialize ambeserver
     g_AmbeServer.SetListenIp(CIp(argv[1]));
 
-    // and let it run
-    std::cout << "Starting AMBEd " << VERSION_MAJOR << "." << VERSION_MINOR << "." << VERSION_REVISION << std::endl << std::endl;
-    if ( !g_AmbeServer.Start() )
+    std::cout
+        << "Starting AMBEd "
+        << VERSION_MAJOR << "."
+        << VERSION_MINOR << "."
+        << VERSION_REVISION
+        << std::endl
+        << std::endl;
+
+    if (!g_AmbeServer.Start())
     {
         std::cout << "Error starting AMBEd" << std::endl;
-#ifdef _WIN32
-        ::timeEndPeriod(1);
-        ::WSACleanup();
-#endif
         return EXIT_FAILURE;
     }
-    std::cout << "AMBEd started and listening on " << g_AmbeServer.GetListenIp() << std::endl;
 
-#if defined(RUN_AS_DAEMON) && !defined(_WIN32)
-    // run forever
-    while ( true )
-    {
-        // sleep 60 seconds
-        CTimePoint::TaskSleepFor(60000);
-    }
-#else
-    // wait any key
-    for (;;)
-    {
-        // sleep 60 seconds
-        CTimePoint::TaskSleepFor(60000);
-        //std::cin.get();
-    }
-#endif
+    std::cout
+        << "AMBEd started and listening on "
+        << g_AmbeServer.GetListenIp()
+        << std::endl;
 
-    // and wait for end
+    while (!g_StopRequested)
+    {
+        CTimePoint::TaskSleepFor(200);
+    }
+
+    std::cout << "Shutdown requested" << std::endl;
+
     g_AmbeServer.Stop();
     std::cout << "AMBEd stopped" << std::endl;
 
-#ifdef _WIN32
-    ::timeEndPeriod(1);
-    ::WSACleanup();
-#endif
-
-    // done
     return EXIT_SUCCESS;
+
+#endif
 }

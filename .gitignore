@@ -1,5 +1,41 @@
+# Existing Linux build outputs
 *.o
 src/xlxd
 ambed/ambed
 ambedtest/ambedtest
+
+# macOS
 .DS_Store
+
+# CMake / Visual Studio build trees
+/build/
+out/
+.vs/
+
+# MSVC generated files
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# Executables and runtime logs
+*.exe
+*.log
+
+# Local Windows D2XX build products
+/build-support/d2xx/*.lib
+/build-support/d2xx/*.exp
+
+# Local development probes
+/sleep-probe.cpp
+/sleep-probe.exe
+/sleep-probe.obj
+
+# Temporary root D2XX files
+/ftd2xx.def
+/ftd2xx.exp
+/ftd2xx.lib
+
+# Temporary development patches
+/ccontroller-init-return-fix.patch

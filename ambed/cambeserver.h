@@ -35,40 +35,37 @@ class CAmbeServer
 public:
     // constructors
     CAmbeServer();
-    
+
     // destructor
     virtual ~CAmbeServer();
-    
+
     // operation
     bool Start(void);
     void Stop(void);
-    
+
     // task
     static void Thread(CAmbeServer *);
     void Task(void);
-    
+
     // get
     const CIp &GetListenIp(void) const   { return m_Controller.GetListenIp(); }
-    
+
     // set
     void SetListenIp(const CIp &ip)      { m_Controller.SetListenIp(ip); }
-    
-    
-    // operator
-    //bool operator ==(const CIp &) const;
-    //operator const char *() const;
-    
+
 protected:
     // objects
-    CController     m_Controller;
-    
+    CController              m_Controller;
+
     // threads
-    bool            m_bStopThreads;
-    std::thread    *m_pThread;
-    
+    std::atomic<bool>        m_bStopThreads;
+    std::thread             *m_pThread;
+    std::mutex               m_StopMutex;
+    std::condition_variable  m_StopCondition;
+
 public:
 #ifdef DEBUG_DUMPFILE
-    std::ofstream        m_DebugFile;
+    std::ofstream            m_DebugFile;
 #endif
 };
 
