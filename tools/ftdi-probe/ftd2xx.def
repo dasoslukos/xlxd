@@ -1,0 +1,4 @@
+LIBRARY FTD2XX
+EXPORTS
+    FT_CreateDeviceInfoList
+    FT_GetDeviceInfoList
