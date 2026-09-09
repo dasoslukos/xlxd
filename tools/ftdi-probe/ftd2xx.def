@@ -2,3 +2,14 @@ LIBRARY FTD2XX
 EXPORTS
     FT_CreateDeviceInfoList
     FT_GetDeviceInfoList
+    FT_OpenEx
+    FT_Close
+    FT_Purge
+    FT_SetDataCharacteristics
+    FT_SetFlowControl
+    FT_SetRts
+    FT_ClrDtr
+    FT_SetBaudRate
+    FT_SetLatencyTimer
+    FT_SetUSBParameters
+    FT_SetTimeouts
