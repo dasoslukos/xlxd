@@ -26,7 +26,9 @@
 #include <string.h>
 #include "cip.h"
 
+#ifndef _WIN32
 #include <netdb.h>
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // constructors
@@ -41,15 +43,29 @@ CIp::CIp(const char *sz)
 {
     ::memset(&m_Addr, 0, sizeof(m_Addr));
     m_Addr.sin_family = AF_INET;
-    // try xxx.xxx.xxx.xxxx first
-    m_Addr.sin_addr.s_addr = inet_addr(sz);
-    if ( m_Addr.sin_addr.s_addr == INADDR_NONE )
+
+    // Try a numeric IPv4 address first.
+    if (::inet_pton(AF_INET, sz, &m_Addr.sin_addr) != 1)
     {
-        // otherwise try to resolve via dns
-        hostent *record = gethostbyname(sz);
-        if( record != NULL )
+        // Otherwise resolve the name via DNS.
+        struct addrinfo hints;
+        ::memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_DGRAM;
+
+        struct addrinfo *result = nullptr;
+
+        if (::getaddrinfo(sz, nullptr, &hints, &result) == 0)
         {
-            m_Addr.sin_addr.s_addr = ((in_addr * )record->h_addr)->s_addr;
+            if (result != nullptr && result->ai_addr != nullptr)
+            {
+                const struct sockaddr_in *resolved =
+                    reinterpret_cast<const struct sockaddr_in *>(result->ai_addr);
+
+                m_Addr.sin_addr = resolved->sin_addr;
+            }
+
+            ::freeaddrinfo(result);
         }
     }
 }
@@ -85,7 +101,12 @@ bool CIp::operator ==(const CIp &ip) const
 
 CIp::operator const char *() const
 {
-    return ::inet_ntoa(m_Addr.sin_addr);
+    static thread_local char szAddress[INET_ADDRSTRLEN];
+
+    if (::inet_ntop(AF_INET, &m_Addr.sin_addr, szAddress, sizeof(szAddress)) == nullptr)
+    {
+        szAddress[0] = '\0';
+    }
+
+    return szAddress;
 }
-
-

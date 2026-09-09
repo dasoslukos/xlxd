@@ -32,7 +32,11 @@
 
 CUdpSocket::CUdpSocket()
 {
+#ifdef _WIN32
+    m_Socket = INVALID_SOCKET;
+#else
     m_Socket = -1;
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +44,11 @@ CUdpSocket::CUdpSocket()
 
 CUdpSocket::~CUdpSocket()
 {
-    if ( m_Socket != -1 )
+#ifdef _WIN32
+    if (m_Socket != INVALID_SOCKET)
+#else
+    if (m_Socket != -1)
+#endif
     {
         Close();
     }
@@ -52,40 +60,81 @@ CUdpSocket::~CUdpSocket()
 bool CUdpSocket::Open(const CIp &ListenIp, uint16 uiPort)
 {
     bool open = false;
-    
+
     // create socket
-    m_Socket = socket(PF_INET,SOCK_DGRAM,0);
-    if ( m_Socket != -1 )
+    m_Socket = ::socket(PF_INET, SOCK_DGRAM, 0);
+
+#ifdef _WIN32
+    if (m_Socket != INVALID_SOCKET)
+#else
+    if (m_Socket != -1)
+#endif
     {
         // initialize sockaddr struct
         ::memset(&m_SocketAddr, 0, sizeof(struct sockaddr_in));
         m_SocketAddr.sin_family = AF_INET;
         m_SocketAddr.sin_port = htons(uiPort);
         m_SocketAddr.sin_addr.s_addr = inet_addr(ListenIp);
-        
-        if ( bind(m_Socket, (struct sockaddr *)&m_SocketAddr, sizeof(struct sockaddr_in)) == 0 )
+
+        if (::bind(m_Socket,
+                   (struct sockaddr *)&m_SocketAddr,
+                   sizeof(struct sockaddr_in)) == 0)
         {
-            fcntl(m_Socket, F_SETFL, O_NONBLOCK);
-            open = true;
+#ifdef _WIN32
+            u_long nonBlocking = 1;
+
+            if (::ioctlsocket(m_Socket, FIONBIO, &nonBlocking) == 0)
+            {
+                open = true;
+            }
+            else
+            {
+                ::closesocket(m_Socket);
+                m_Socket = INVALID_SOCKET;
+            }
+#else
+            if (::fcntl(m_Socket, F_SETFL, O_NONBLOCK) != -1)
+            {
+                open = true;
+            }
+            else
+            {
+                ::close(m_Socket);
+                m_Socket = -1;
+            }
+#endif
         }
         else
         {
-            close(m_Socket);
+#ifdef _WIN32
+            ::closesocket(m_Socket);
+            m_Socket = INVALID_SOCKET;
+#else
+            ::close(m_Socket);
             m_Socket = -1;
+#endif
         }
     }
-    
+
     // done
     return open;
 }
 
 void CUdpSocket::Close(void)
 {
-    if ( m_Socket != -1 )
+#ifdef _WIN32
+    if (m_Socket != INVALID_SOCKET)
     {
-        close(m_Socket);
+        ::closesocket(m_Socket);
+        m_Socket = INVALID_SOCKET;
+    }
+#else
+    if (m_Socket != -1)
+    {
+        ::close(m_Socket);
         m_Socket = -1;
     }
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -95,39 +144,65 @@ int CUdpSocket::Receive(CBuffer *Buffer, CIp *Ip, int timeout)
 {
     struct sockaddr_in Sin;
     fd_set FdSet;
-    unsigned int uiFromLen = sizeof(struct sockaddr_in);
     int iRecvLen = -1;
     struct timeval tv;
-    
+
+#ifdef _WIN32
+    int uiFromLen = sizeof(struct sockaddr_in);
+#else
+    socklen_t uiFromLen = sizeof(struct sockaddr_in);
+#endif
+
     // socket valid ?
-    if ( m_Socket != -1 )
+#ifdef _WIN32
+    if (m_Socket != INVALID_SOCKET)
+#else
+    if (m_Socket != -1)
+#endif
     {
         // control socket
         FD_ZERO(&FdSet);
         FD_SET(m_Socket, &FdSet);
+
         tv.tv_sec = timeout / 1000;
         tv.tv_usec = (timeout % 1000) * 1000;
-        select(m_Socket + 1, &FdSet, 0, 0, &tv);
-        
-        // allocate buffer
-        Buffer->resize(UDP_BUFFER_LENMAX);
-        
-        // read
-        iRecvLen = (int)recvfrom(m_Socket,
-            (void *)Buffer->data(), UDP_BUFFER_LENMAX,
-            0, (struct sockaddr *)&Sin, &uiFromLen);
-        
-        // handle
-        if ( iRecvLen != -1 )
+
+#ifdef _WIN32
+        int selectResult = ::select(0, &FdSet, nullptr, nullptr, &tv);
+#else
+        int selectResult = ::select(m_Socket + 1, &FdSet, nullptr, nullptr, &tv);
+#endif
+
+        if (selectResult > 0 && FD_ISSET(m_Socket, &FdSet))
         {
-            // adjust buffer size
-            Buffer->resize(iRecvLen);
-            
-            // get IP
-            Ip->SetSockAddr(&Sin);
+            // allocate buffer
+            Buffer->resize(UDP_BUFFER_LENMAX);
+
+            // read
+            iRecvLen = (int)::recvfrom(
+                m_Socket,
+#ifdef _WIN32
+                reinterpret_cast<char *>(Buffer->data()),
+#else
+                reinterpret_cast<void *>(Buffer->data()),
+#endif
+                UDP_BUFFER_LENMAX,
+                0,
+                (struct sockaddr *)&Sin,
+                &uiFromLen);
+
+            // handle
+            if (iRecvLen != -1)
+            {
+                // adjust buffer size
+                Buffer->resize(iRecvLen);
+
+                // get IP
+                Ip->SetSockAddr(&Sin);
+            }
         }
     }
- 
+
     // done
     return iRecvLen;
 }
@@ -138,35 +213,61 @@ int CUdpSocket::Receive(CBuffer *Buffer, CIp *Ip, int timeout)
 int CUdpSocket::Send(const CBuffer &Buffer, const CIp &Ip)
 {
     CIp temp(Ip);
-    return (int)::sendto(m_Socket,
-           (void *)Buffer.data(), Buffer.size(),
-           0, (struct sockaddr *)temp.GetSockAddr(), sizeof(struct sockaddr_in));
+
+    return (int)::sendto(
+        m_Socket,
+#ifdef _WIN32
+        reinterpret_cast<const char *>(Buffer.data()),
+#else
+        reinterpret_cast<const void *>(Buffer.data()),
+#endif
+        (int)Buffer.size(),
+        0,
+        (struct sockaddr *)temp.GetSockAddr(),
+        sizeof(struct sockaddr_in));
 }
 
 int CUdpSocket::Send(const char *Buffer, const CIp &Ip)
 {
     CIp temp(Ip);
-    return (int)::sendto(m_Socket,
-           (void *)Buffer, ::strlen(Buffer),
-           0, (struct sockaddr *)temp.GetSockAddr(), sizeof(struct sockaddr_in));
+
+    return (int)::sendto(
+        m_Socket,
+        Buffer,
+        (int)::strlen(Buffer),
+        0,
+        (struct sockaddr *)temp.GetSockAddr(),
+        sizeof(struct sockaddr_in));
 }
 
 int CUdpSocket::Send(const CBuffer &Buffer, const CIp &Ip, uint16 destport)
 {
     CIp temp(Ip);
     temp.GetSockAddr()->sin_port = htons(destport);
-    return (int)::sendto(m_Socket,
-                         (void *)Buffer.data(), Buffer.size(),
-                         0, (struct sockaddr *)temp.GetSockAddr(), sizeof(struct sockaddr_in));
+
+    return (int)::sendto(
+        m_Socket,
+#ifdef _WIN32
+        reinterpret_cast<const char *>(Buffer.data()),
+#else
+        reinterpret_cast<const void *>(Buffer.data()),
+#endif
+        (int)Buffer.size(),
+        0,
+        (struct sockaddr *)temp.GetSockAddr(),
+        sizeof(struct sockaddr_in));
 }
 
 int CUdpSocket::Send(const char *Buffer, const CIp &Ip, uint16 destport)
 {
     CIp temp(Ip);
     temp.GetSockAddr()->sin_port = htons(destport);
-    return (int)::sendto(m_Socket,
-                         (void *)Buffer, ::strlen(Buffer),
-                         0, (struct sockaddr *)temp.GetSockAddr(), sizeof(struct sockaddr_in));
+
+    return (int)::sendto(
+        m_Socket,
+        Buffer,
+        (int)::strlen(Buffer),
+        0,
+        (struct sockaddr *)temp.GetSockAddr(),
+        sizeof(struct sockaddr_in));
 }
-
-

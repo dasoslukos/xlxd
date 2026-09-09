@@ -40,7 +40,24 @@
 #include <iomanip>
 #include <fstream>
 #include <algorithm>
+#ifdef _WIN32
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+#else
+
 #include <arpa/inet.h>
+
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // defines
@@ -90,14 +107,37 @@ typedef unsigned int            uint;
 ////////////////////////////////////////////////////////////////////////////////////////
 // macros
 
-#define MIN(a,b) 				((a) < (b))?(a):(b)
-#define MAX(a,b) 				((a) > (b))?(a):(b)
-#define MAKEWORD(low, high)		((uint16)(((uint8)(low)) | (((uint16)((uint8)(high))) << 8)))
-#define MAKEDWORD(low, high)	((uint32)(((uint16)(low)) | (((uint32)((uint16)(high))) << 16)))
-#define LOBYTE(w)				((uint8)(uint16)(w & 0x00FF))
-#define HIBYTE(w)				((uint8)((((uint16)(w)) >> 8) & 0xFF))
-#define LOWORD(dw)				((uint16)(uint32)(dw & 0x0000FFFF))
-#define HIWORD(dw)				((uint16)((((uint32)(dw)) >> 16) & 0xFFFF))
+#ifndef MIN
+#define MIN(a,b)                 (((a) < (b)) ? (a) : (b))
+#endif
+
+#ifndef MAX
+#define MAX(a,b)                 (((a) > (b)) ? (a) : (b))
+#endif
+
+#ifndef MAKEWORD
+#define MAKEWORD(low, high)      ((uint16)(((uint8)(low)) | (((uint16)((uint8)(high))) << 8)))
+#endif
+
+#ifndef MAKEDWORD
+#define MAKEDWORD(low, high)     ((uint32)(((uint16)(low)) | (((uint32)((uint16)(high))) << 16)))
+#endif
+
+#ifndef LOBYTE
+#define LOBYTE(w)                ((uint8)(uint16)((w) & 0x00FF))
+#endif
+
+#ifndef HIBYTE
+#define HIBYTE(w)                ((uint8)((((uint16)(w)) >> 8) & 0xFF))
+#endif
+
+#ifndef LOWORD
+#define LOWORD(dw)               ((uint16)(uint32)((dw) & 0x0000FFFF))
+#endif
+
+#ifndef HIWORD
+#define HIWORD(dw)               ((uint16)((((uint32)(dw)) >> 16) & 0xFFFF))
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // FIR Filter coefficients computed to be the closest to the recommended filter in 

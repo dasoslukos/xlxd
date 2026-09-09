@@ -18,6 +18,8 @@
 #ifndef __syslog
 #define __syslog
 
+#ifndef _WIN32
+
 #include <iostream>
 #include <streambuf>
 #include <string>
@@ -90,7 +92,6 @@ namespace syslog
 	};
 }
 
+#endif /* !_WIN32 */
+
 #endif
-
-
-

@@ -25,6 +25,21 @@
 #ifndef cudpsocket_h
 #define cudpsocket_h
 
+#ifdef _WIN32
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+#else
+
 #include <sys/types.h>
 //#include <sys/stat.h>
 #include <unistd.h>
@@ -32,6 +47,8 @@
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
+
+#endif
 
 #include "cip.h"
 #include "cbuffer.h"
@@ -57,7 +74,11 @@ public:
     // open & close
     bool Open(const CIp &, uint16);
     void Close(void);
-    int  GetSocket(void)        { return m_Socket; }
+#ifdef _WIN32
+    SOCKET GetSocket(void)  { return m_Socket; }
+#else
+    int GetSocket(void)     { return m_Socket; }
+#endif
     
     // read
     int Receive(CBuffer *, CIp *, int);
@@ -70,7 +91,11 @@ public:
     
 protected:
     // data
+#ifdef _WIN32
+    SOCKET              m_Socket;
+#else
     int                 m_Socket;
+#endif
     struct sockaddr_in  m_SocketAddr;
 };
 

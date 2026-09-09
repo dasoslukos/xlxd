@@ -48,8 +48,13 @@ bool CUsb3003DF2ETInterface::OpenDevice(void)
     int baudrate = 921600;
     
     //sets serial VID/PID for a Standard Device NOTE:  This is for legacy purposes only.  This can be ommitted.
+#ifndef _WIN32
     ftStatus = FT_SetVIDPID(m_uiVid, m_uiPid);
-    if (ftStatus != FT_OK) {FTDI_Error((char *)"FT_SetVIDPID", ftStatus ); return false; }
+    if (ftStatus != FT_OK) {
+        FTDI_Error((char *)"FT_SetVIDPID", ftStatus);
+        return false;
+    }
+#endif
     
     ftStatus = FT_OpenEx((PVOID)m_szDeviceSerial, FT_OPEN_BY_SERIAL_NUMBER, &m_FtdiHandle);
     if (ftStatus != FT_OK) { FTDI_Error((char *)"FT_OpenEx", ftStatus ); return false; }
@@ -161,4 +166,3 @@ bool CUsb3003DF2ETInterface::ResetDevice(void)
     }
     return ok;
 }
-
