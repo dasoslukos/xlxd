@@ -39,3 +39,5 @@ out/
 
 # Temporary development patches
 /ccontroller-init-return-fix.patch
+# Generated release packages
+/release/
